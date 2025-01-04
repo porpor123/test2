@@ -1,0 +1,96 @@
+To set up and run all five bots (Listener Bot, Buy Bot, Sell Bot, Log Bot, and Telegram Bot), you'll need to install several prerequisites. Here’s a comprehensive list of the necessary installations and setup steps:
+General Prerequisites
+
+    Node.js and npm:
+        Ensure Node.js and npm are installed on your machine. You can download and install them from Node.js official website.
+
+    Install Dependencies:
+        Each bot will have its own dependencies that need to be installed via npm.
+
+Specific Prerequisites for Each Bot
+1. Listener Bot
+
+Dependencies:
+
+    express
+    body-parser
+    chalk
+    @solana/web3.js (assuming it's interacting with the Solana blockchain)
+
+Installation:
+
+npm install express body-parser chalk @solana/web3.js
+
+2. Buy Bot
+
+Dependencies:
+
+    express
+    body-parser
+    chalk
+    @solana/web3.js
+    http
+
+Installation:
+
+npm install express body-parser chalk @solana/web3.js http
+
+3. Sell Bot
+
+Dependencies:
+
+    http
+    chalk
+    @solana/web3.js
+
+Installation:
+
+npm install chalk @solana/web3.js http
+
+4. Log Bot
+
+Dependencies:
+
+    express
+    body-parser
+    chalk
+    fs (Node.js built-in)
+    path (Node.js built-in)
+    exceljs
+    axios
+
+Installation:
+
+npm install express body-parser chalk exceljs axios
+
+5. Telegram Bot
+
+Dependencies:
+
+    express
+    body-parser
+    node-telegram-bot-api
+
+Installation:
+
+npm install express body-parser node-telegram-bot-api
+
+Summary
+
+Here is the consolidated command to install all the required dependencies:
+
+npm install express body-parser chalk @solana/web3.js http exceljs axios node-telegram-bot-api
+
+Additional Setup
+
+    Create and Set Up Telegram Bot:
+        Create a new bot on Telegram using BotFather and obtain the bot token.
+        Configure the bot token and chat ID in your telegramBot.js.
+
+    Ensure Proper Configuration:
+        Make sure all bots are configured correctly with the necessary keys, tokens, and other configuration parameters.
+
+    Running the Bots:
+        Start each bot by navigating to its directory and running:
+
+        node <bot-filename>.js

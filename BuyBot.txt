@@ -1,0 +1,129 @@
+const express = require('express');
+const bodyParser = require('body-parser');
+const chalk = require('chalk');
+const { Connection, PublicKey, Keypair, LAMPORTS_PER_SOL } = require('@solana/web3.js');
+const http = require('http');
+const app = express();
+const port = 3001;
+
+const connection = new Connection('https://api.mainnet-beta.solana.com');
+
+// Replace with your wallet's private key
+const privateKey = Uint8Array.from([/* private key array here */]);
+const wallet = Keypair.fromSecretKey(privateKey);
+
+app.use(bodyParser.json());
+
+// Function to send a POST request to another service
+const sendPostRequest = (host, port, path, data) => {
+  const dataString = JSON.stringify(data);
+  const options = {
+    hostname: host,
+    port: port,
+    path: path,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': dataString.length
+    }
+  };
+
+  const req = http.request(options, (res) => {
+    res.on('data', (d) => {
+      process.stdout.write(d);
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error('Error sending POST request:', error);
+  });
+
+  req.write(dataString);
+  req.end();
+};
+
+// Function to check if token is a honeypot
+const isHoneypot = async (tokenAddress) => {
+  // Implement honeypot detection logic here
+  // Placeholder: assuming a function that returns true if the token is a honeypot
+  const honeypotDetected = false;
+  return honeypotDetected;
+};
+
+// Function to buy tokens
+const buyTokens = async (tokenInfo) => {
+  const { tokenAddress } = tokenInfo;
+  const amountToBuy = 0.01 * LAMPORTS_PER_SOL; // 0.01 WSOL in lamports
+
+  try {
+    // Check if the token is a honeypot
+    if (await isHoneypot(tokenAddress)) {
+      console.log(chalk.red('Token identified as a honeypot, skipping purchase'));
+      return;
+    }
+
+    // Implement token buying logic here
+    console.log(`Buying ${amountToBuy} lamports worth of token at ${tokenAddress}`);
+
+    // Simulate a successful purchase
+    const purchaseSuccess = true;
+
+    if (purchaseSuccess) {
+      console.log(chalk.green('Token purchased successfully'));
+
+      // Notify Log Bot
+      sendPostRequest('localhost', 3002, '/log', {
+        ...tokenInfo,
+        status: 'Purchased',
+        amountBought: amountToBuy
+      });
+
+      // Store purchase data for future sell logic
+      storePurchaseData(tokenInfo, amountToBuy);
+    } else {
+      console.log(chalk.red('Token purchase failed'));
+
+      // Notify Log Bot
+      sendPostRequest('localhost', 3002, '/log', {
+        ...tokenInfo,
+        status: 'Purchase Failed'
+      });
+    }
+  } catch (error) {
+    console.error('Error buying tokens:', error);
+  }
+};
+
+// Function to store purchase data
+const storePurchaseData = (tokenInfo, amountBought) => {
+  const { tokenAddress, tokenName } = tokenInfo;
+  purchaseData[tokenAddress] = {
+    tokenName,
+    amountBought,
+    initialPrice: getCurrentTokenPrice(tokenAddress),
+    sellTargets: [2, 2.5, 3, 5, 6], // 100%, 150%, 200%, 400%, 500% profit targets
+    sellPercentages: [0.35, 0.25, 0.2, 0.1, 0.1]
+  };
+};
+
+// Function to get current token price (placeholder)
+const getCurrentTokenPrice = (tokenAddress) => {
+  return 1; // Placeholder price
+};
+
+// In-memory storage for purchase data
+const purchaseData = {};
+
+// Endpoint to handle buy requests
+app.post('/buy', async (req, res) => {
+  const tokenInfo = req.body;
+  console.log(chalk.blue('\nAttempting to buy token...\n'));
+
+  await buyTokens(tokenInfo);
+
+  res.status(200).send('Buy process completed');
+});
+
+app.listen(port, () => {
+  console.log(`Buy bot is running on port ${port}`);
+});

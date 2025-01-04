@@ -1,0 +1,128 @@
+const express = require('express');
+const bodyParser = require('body-parser');
+const chalk = require('chalk');
+const fs = require('fs');
+const path = require('path');
+const ExcelJS = require('exceljs');
+const axios = require('axios');
+const app = express();
+const port = 3002;
+
+app.use(bodyParser.json());
+
+const logFilePath = path.join(__dirname, 'transaction_logs.json');
+
+// Function to log data to a file and notify Telegram Bot
+const logToFileAndNotifyTelegram = (data) => {
+  fs.appendFile(logFilePath, JSON.stringify(data) + '\n', (err) => {
+    if (err) {
+      console.error('Error logging data to file:', err);
+    } else {
+      console.log(`Record for token ${data.tokenName} saved to log file.`);
+      notifyTelegramBot(data);
+    }
+  });
+};
+
+// Function to notify Telegram Bot
+const notifyTelegramBot = (logInfo) => {
+  const message = `
+*Token Transaction Log*
+Token Name: ${logInfo.tokenName}
+${logInfo.amountBought ? `Bought: ${logInfo.amountBought} tokens at ${logInfo.buyPrice} SOL each\nTotal Cost: ${logInfo.totalCost} SOL` : ''}
+${logInfo.amountSold ? `Sold: ${logInfo.amountSold} tokens at ${logInfo.sellPrice} SOL each\nSell Price: ${logInfo.sellPrice} SOL\nPercentage Gain: ${logInfo.percentageGain}%` : ''}
+Status: ${logInfo.status}
+[Solscan URL](${logInfo.solscanUrl})
+[Dexscreener URL](${logInfo.dexscreenerUrl})
+`;
+
+  axios.post('http://localhost:3003/log', { message })
+    .then(response => {
+      console.log('Notified Telegram Bot:', response.data);
+    })
+    .catch(error => {
+      console.error('Error notifying Telegram Bot:', error);
+    });
+};
+
+// Function to log data and confirm saving
+const logData = (logInfo) => {
+  console.log(chalk.green('\n********** LOGGING TOKEN TRANSACTION **********\n'));
+
+  logToFileAndNotifyTelegram(logInfo);
+
+  console.log(chalk.green(`Token: ${logInfo.tokenName}`));
+  if (logInfo.amountBought) {
+    console.log(chalk.cyan(`Bought: ${logInfo.amountBought} tokens at ${logInfo.buyPrice} SOL each`));
+    console.log(chalk.cyan(`Total Cost: ${logInfo.totalCost} SOL`));
+  }
+  if (logInfo.amountSold) {
+    console.log(chalk.cyan(`Sold: ${logInfo.amountSold} tokens at ${logInfo.sellPrice} SOL each`));
+    console.log(chalk.cyan(`Sell Price: ${logInfo.sellPrice} SOL`));
+    console.log(chalk.cyan(`Percentage Gain: ${logInfo.percentageGain}%`));
+  }
+  console.log(chalk.magenta(`Status: ${logInfo.status}`));
+  console.log(chalk.green('Record saved to log file and reported to Telegram.\n'));
+};
+
+// Endpoint to handle log requests
+app.post('/log', (req, res) => {
+  const logInfo = req.body;
+
+  logData(logInfo);
+
+  res.status(200).send('Log process completed');
+});
+
+// Function to generate report and export to Excel file, grouped by token
+const generateReport = () => {
+  const logs = fs.readFileSync(logFilePath, 'utf8').split('\n').filter(Boolean).map(JSON.parse);
+
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Transaction Logs');
+
+  worksheet.columns = [
+    { header: 'Timestamp', key: 'timestamp', width: 20 },
+    { header: 'Token Name', key: 'tokenName', width: 20 },
+    { header: 'SOL Invested', key: 'solInvested', width: 15 },
+    { header: 'Solscan URL', key: 'solscanUrl', width: 30 },
+    { header: 'Dexscreener URL', key: 'dexscreenerUrl', width: 30 },
+    { header: 'Status', key: 'status', width: 15 },
+    { header: 'Amount Bought', key: 'amountBought', width: 15 },
+    { header: 'Buy Price', key: 'buyPrice', width: 15 },
+    { header: 'Amount Sold', key: 'amountSold', width: 15 },
+    { header: 'Sell Price', key: 'sellPrice', width: 15 },
+    { header: 'Percentage Gain', key: 'percentageGain', width: 15 },
+  ];
+
+  const groupedLogs = logs.reduce((acc, log) => {
+    if (!acc[log.tokenName]) acc[log.tokenName] = [];
+    acc[log.tokenName].push(log);
+    return acc;
+  }, {});
+
+  Object.keys(groupedLogs).forEach(tokenName => {
+    groupedLogs[tokenName].forEach(log => {
+      worksheet.addRow(log);
+    });
+    worksheet.addRow({});
+  });
+
+  workbook.xlsx.writeFile('Transaction_Logs_Report.xlsx')
+    .then(() => {
+      console.log('Excel report generated successfully');
+    })
+    .catch(err => {
+      console.error('Error generating Excel report:', err);
+    });
+};
+
+// Endpoint to trigger report generation
+app.get('/generate-report', (req, res) => {
+  generateReport();
+  res.status(200).send('Report generation initiated');
+});
+
+app.listen(port, () => {
+  console.log(`Log Bot is running on port ${port}`);
+});

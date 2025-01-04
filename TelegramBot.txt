@@ -1,0 +1,44 @@
+const express = require('express');
+const bodyParser = require('body-parser');
+const TelegramBot = require('node-telegram-bot-api');
+
+const app = express();
+const port = 3003;
+
+// Telegram bot token and chat ID
+const telegramToken = 'YOUR_TELEGRAM_BOT_TOKEN';
+const chatId = 'YOUR_CHAT_ID'; // Replace with your Telegram chat ID
+const bot = new TelegramBot(telegramToken, { polling: true });
+
+app.use(bodyParser.json());
+
+// Function to send message to Telegram
+const sendTelegramMessage = (logInfo) => {
+  const message = `
+*Token Transaction Log*
+Token Name: ${logInfo.tokenName}
+SOL Invested: ${logInfo.solInvested}
+Status: ${logInfo.status}
+${logInfo.amountBought ? `Amount Bought: ${logInfo.amountBought}` : ''}
+${logInfo.buyPrice ? `Buy Price: ${logInfo.buyPrice}` : ''}
+${logInfo.amountSold ? `Amount Sold: ${logInfo.amountSold}` : ''}
+${logInfo.sellPrice ? `Sell Price: ${logInfo.sellPrice}` : ''}
+[Solscan URL](${logInfo.solscanUrl})
+[Dexscreener URL](${logInfo.dexscreenerUrl})
+`;
+
+  bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+};
+
+// Endpoint to receive log data from Log Bot
+app.post('/log', (req, res) => {
+  const logInfo = req.body;
+
+  sendTelegramMessage(logInfo);
+
+  res.status(200).send('Log data received and message sent to Telegram');
+});
+
+app.listen(port, () => {
+  console.log(`Telegram bot is running on port ${port}`);
+});

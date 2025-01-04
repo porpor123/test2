@@ -1,0 +1,77 @@
+const express = require('express');
+const bodyParser = require('body-parser');
+const axios = require('axios');
+const chalk = require('chalk');
+const { Connection, PublicKey } = require('@solana/web3.js');
+const app = express();
+const port = 3000;
+
+// Middleware to parse JSON bodies
+app.use(bodyParser.json());
+
+// Handle favicon.ico requests to avoid errors
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
+// Initialize Solana connection (use the mainnet-beta cluster)
+const connection = new Connection('https://api.mainnet-beta.solana.com');
+
+// Function to check if the ownership has been renounced
+const isOwnershipRenounced = async (programId) => {
+  try {
+    const programInfo = await connection.getAccountInfo(new PublicKey(programId));
+    if (!programInfo) {
+      console.log(chalk.red('Program not found.'));
+      return false;
+    }
+
+    // Replace with the actual logic to check for ownership renouncement
+    // This might involve checking specific account data or metadata
+    const ownerAddress = 'OwnerAddressHere'; // Replace with actual owner address to check
+    const accountInfo = await connection.getParsedAccountInfo(new PublicKey(ownerAddress));
+
+    // Example check: if the owner address is a known "null" address indicating renouncement
+    const ownershipRenounced = accountInfo.value.owner.toBase58() === '11111111111111111111111111111111';
+    return ownershipRenounced;
+  } catch (error) {
+    console.error('Error checking ownership:', error);
+    return false;
+  }
+};
+
+// Endpoint to receive webhook events
+app.post('/webhook', async (req, res) => {
+  const event = req.body;
+  console.log(chalk.green('\n********** NEW TOKEN DETECTED **********\n'));
+
+  // Extract relevant information
+  const tokenInfo = {
+    tokenName: event.tokenName || 'Unknown Token',
+    solInvested: event.solInvested || 0,
+    solscanUrl: event.solscanUrl || 'N/A',
+    dexscreenerUrl: event.dexscreenerUrl || 'N/A',
+    programId: event.programId || '11111111111111111111111111111111', // Add program ID from event
+  };
+
+  // Log relevant information with colors
+  console.log(chalk.green(`Token Name: ${tokenInfo.tokenName}`));
+  console.log(chalk.yellow(`SOL Invested: ${tokenInfo.solInvested}`));
+  console.log(chalk.blue(`Solscan URL: ${tokenInfo.solscanUrl}`));
+  console.log(chalk.blue(`Dexscreener URL: ${tokenInfo.dexscreenerUrl}`));
+
+  // Check if ownership has been renounced
+  const ownershipRenounced = await isOwnershipRenounced(tokenInfo.programId);
+  if (ownershipRenounced) {
+    console.log(chalk.green.bold('\nOWNERSHIP RENOUNCED - SAFE TO PROCEED\n'));
+  } else {
+    console.log(chalk.red.bold('\nOWNERSHIP NOT RENOUNCED - PROCEED WITH CAUTION\n'));
+  }
+
+  console.log(chalk.green('\n***************************************\n'));
+
+  res.status(200).send('Event received');
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Listener bot is running on port ${port}`);
+});

@@ -1,0 +1,112 @@
+const http = require('http');
+const chalk = require('chalk');
+const { Connection, PublicKey, Keypair, LAMPORTS_PER_SOL } = require('@solana/web3.js');
+
+const connection = new Connection('https://api.mainnet-beta.solana.com');
+
+// Replace with your wallet's private key
+const privateKey = Uint8Array.from([/* private key array here */]);
+const wallet = Keypair.fromSecretKey(privateKey);
+
+// In-memory storage for purchase data (shared with Buy Bot)
+const purchaseData = {};
+
+// Function to send a POST request to another service
+const sendPostRequest = (host, port, path, data) => {
+  const dataString = JSON.stringify(data);
+  const options = {
+    hostname: host,
+    port: port,
+    path: path,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': dataString.length
+    }
+  };
+
+  const req = http.request(options, (res) => {
+    res.on('data', (d) => {
+      process.stdout.write(d);
+    });
+  });
+
+  req.on('error', (error) => {
+    console.error('Error sending POST request:', error);
+  });
+
+  req.write(dataString);
+  req.end();
+};
+
+// Function to sell tokens
+const sellTokens = async (tokenAddress, amountToSell, price) => {
+  try {
+    // Implement token selling logic here
+    console.log(`Selling ${amountToSell} lamports worth of token at ${tokenAddress}`);
+
+    // Simulate a successful sell
+    const sellSuccess = true;
+
+    if (sellSuccess) {
+      console.log(chalk.green('Token sold successfully'));
+
+      // Notify Log Bot
+      sendPostRequest('localhost', 3002, '/log', {
+        tokenAddress,
+        status: 'Sold',
+        amountSold: amountToSell,
+        sellPrice: price
+      });
+    } else {
+      console.log(chalk.red('Token sell failed'));
+
+      // Notify Log Bot
+      sendPostRequest('localhost', 3002, '/log', {
+        tokenAddress,
+        status: 'Sell Failed'
+      });
+    }
+  } catch (error) {
+    console.error('Error selling tokens:', error);
+  }
+};
+
+// Function to monitor token prices and execute sell logic
+const monitorTokenPrices = async () => {
+  while (true) {
+    for (const tokenAddress in purchaseData) {
+      const purchase = purchaseData[tokenAddress];
+      const currentPrice = getCurrentTokenPrice(tokenAddress);
+
+      // Implement stop loss logic
+      if (currentPrice <= purchase.initialPrice * 0.8) { // Example SL: 20% loss
+        sellTokens(tokenAddress, purchase.amountBought, currentPrice);
+        delete purchaseData[tokenAddress]; // Remove after sell
+        continue;
+      }
+
+      purchase.sellTargets.forEach((target, index) => {
+        if (currentPrice >= purchase.initialPrice * target) {
+          const amountToSell = purchase.amountBought * purchase.sellPercentages[index];
+          sellTokens(tokenAddress, amountToSell, currentPrice);
+
+          // Remove the sell target and percentage to avoid selling multiple times
+          purchase.sellTargets.splice(index, 1);
+          purchase.sellPercentages.splice(index, 1);
+        }
+      });
+    }
+
+    // Wait for a while before checking again
+    await new Promise(resolve => setTimeout(resolve, 60000)); // Check every minute
+  }
+};
+
+// Function to get current token price (placeholder)
+const getCurrentTokenPrice = (tokenAddress) => {
+  return 1; // Placeholder price
+};
+
+// Start monitoring token prices
+monitorTokenPrices();
